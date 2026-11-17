@@ -1,0 +1,27 @@
+<clickhouse>
+  <!-- Rendered from storage.xml.tmpl by ./lakehouse.sh init -->
+  <storage_configuration>
+    <disks>
+      <s3_cold>
+        <type>s3</type>
+        <endpoint>http://ceph-rgw:8080/lake-clickhouse/</endpoint>
+        <access_key_id>{{CEPH_ACCESS_KEY_ID}}</access_key_id>
+        <secret_access_key>{{CEPH_SECRET_ACCESS_KEY}}</secret_access_key>
+        <region>us-east-1</region>
+        <support_batch_delete>true</support_batch_delete>
+      </s3_cold>
+    </disks>
+    <policies>
+      <tiered>
+        <volumes>
+          <hot>
+            <disk>default</disk>
+          </hot>
+          <cold>
+            <disk>s3_cold</disk>
+          </cold>
+        </volumes>
+      </tiered>
+    </policies>
+  </storage_configuration>
+</clickhouse>

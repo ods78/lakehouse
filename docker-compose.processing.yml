@@ -1,0 +1,134 @@
+# =============================================================================
+# LakeHouse — Phase 4: PROCESSING & ORCHESTRATION
+# Spark 3.5 (custom image with Iceberg + Kafka jars), Airflow 2.10 (LocalExecutor)
+# dbt and Great Expectations run inside the Airflow image (see Dockerfile).
+# =============================================================================
+volumes:
+  airflow-logs:
+
+x-airflow-common: &airflow-common
+  build:
+    context: ./processing/airflow
+    args:
+      AIRFLOW_VERSION: ${AIRFLOW_VERSION}
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1}
+  image: lakehouse/airflow:${AIRFLOW_VERSION}
+  restart: unless-stopped
+  environment:
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@lakehouse-postgres:5432/airflow
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "False"
+    AIRFLOW__CORE__FERNET_KEY: ${AIRFLOW_FERNET_KEY}
+    AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_WEBSERVER_SECRET_KEY}
+    AIRFLOW__CORE__DEFAULT_TIMEZONE: ${TZ}
+    AIRFLOW__SCHEDULER__MIN_FILE_PROCESS_INTERVAL: 10
+    # Spark jobs path inside the container (bind-mounted below)
+    PYTHONPATH: /opt/spark/jobs:/opt/airflow/dags
+    POSTGRES_USER: ${POSTGRES_USER}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    AIRFLOW_ADMIN_USER: ${AIRFLOW_ADMIN_USER}
+    AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD}
+    SUPERSET_ADMIN_EMAIL: ${SUPERSET_ADMIN_EMAIL}
+    # S3 (Ceph) and ClickHouse credentials available to DAGs and spark-submit jobs
+    CEPH_ACCESS_KEY_ID: ${CEPH_ACCESS_KEY_ID}
+    CEPH_SECRET_ACCESS_KEY: ${CEPH_SECRET_ACCESS_KEY}
+    CLICKHOUSE_USER: ${CLICKHOUSE_USER}
+    CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+  volumes:
+    - ./processing/airflow/dags:/opt/airflow/dags:ro
+    - ./processing/spark/jobs:/opt/spark/jobs:ro
+    - ./processing/dbt:/opt/dbt
+    - ./processing/great-expectations:/opt/airflow/great_expectations
+    - airflow-logs:/opt/airflow/logs
+  depends_on:
+    lakehouse-postgres:
+      condition: service_healthy
+  networks:
+    - lakehouse
+
+services:
+  spark-master:
+    build:
+      context: ./processing/spark
+      args:
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1}
+    image: lakehouse/spark:${SPARK_VERSION}
+    container_name: lakehouse-spark-master
+    restart: unless-stopped
+    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.master.Master",
+              "--host", "spark-master", "--port", "7077", "--webui-port", "8080"]
+    environment:
+      SPARK_MASTER_HOST: spark-master
+      SPARK_MASTER_PORT: "7077"
+      SPARK_MASTER_WEBUI_PORT: "8080"
+    ports:
+      - "${SPARK_MASTER_HOST_PORT}:7077"
+      - "${SPARK_UI_HOST_PORT}:8080"
+    volumes:
+      - ./processing/spark/jobs:/opt/spark/jobs
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+    networks:
+      - lakehouse
+
+  spark-worker:
+    image: lakehouse/spark:${SPARK_VERSION}
+    container_name: lakehouse-spark-worker
+    restart: unless-stopped
+    command: ["/opt/spark/bin/spark-class", "org.apache.spark.deploy.worker.Worker",
+              "spark://spark-master:7077", "--webui-port", "8081",
+              "--cores", "4", "--memory", "8G"]
+    environment:
+      SPARK_WORKER_CORES: "4"
+      SPARK_WORKER_MEMORY: 8G
+    depends_on:
+      spark-master:
+        condition: service_healthy
+    networks:
+      - lakehouse
+
+  airflow-webserver:
+    <<: *airflow-common
+    container_name: lakehouse-airflow-webserver
+    command: webserver
+    ports:
+      - "${AIRFLOW_HOST_PORT}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: lakehouse-airflow-scheduler
+    command: scheduler
+    healthcheck:
+      # 2.10 removed --job-name — match the scheduler job by type instead
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # Idempotent bootstrap: db migrate + admin user (runs on every up, exits 0)
+  airflow-init:
+    <<: *airflow-common
+    container_name: lakehouse-airflow-init
+    restart: "no"
+    command: >
+      bash -c "airflow db migrate &&
+               (airflow users list 2>/dev/null | grep -q \"| ${AIRFLOW_ADMIN_USER} |\" ||
+                airflow users create --username ${AIRFLOW_ADMIN_USER} --password ${AIRFLOW_ADMIN_PASSWORD}
+                 --firstname Lake --lastname House --role Admin --email ${SUPERSET_ADMIN_EMAIL});
+               echo 'airflow-init done'"

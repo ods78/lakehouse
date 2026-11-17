@@ -1,0 +1,5 @@
+<clickhouse>
+    <!-- Listen on all IPv4 interfaces so mapped docker ports (8123/9000) work.
+         (:: omitted: no IPv6 inside the container) -->
+    <listen_host>0.0.0.0</listen_host>
+</clickhouse>

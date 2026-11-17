@@ -1,0 +1,90 @@
+{
+  "realm": "lakehouse",
+  "enabled": true,
+  "sslRequired": "NONE",
+  "registrationAllowed": false,
+  "loginTheme": "keycloak",
+  "roles": {
+    "realm": [
+      { "name": "lakehouse-admin" },
+      { "name": "lakehouse-analyst" }
+    ]
+  },
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "email": "admin@lakehouse.local",
+      "firstName": "Lake",
+      "lastName": "Admin",
+      "realmRoles": ["lakehouse-admin", "offline_access", "uma_authorization"]
+    },
+    {
+      "username": "analyst",
+      "enabled": true,
+      "email": "analyst@lakehouse.local",
+      "firstName": "Lake",
+      "lastName": "Analyst",
+      "realmRoles": ["lakehouse-analyst", "offline_access"]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "superset",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "redirectUris": ["http://localhost:18888/*", "http://superset.lakehouse.local:18888/*"],
+      "webOrigins": ["*"]
+    },
+    {
+      "clientId": "airflow",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "redirectUris": ["http://localhost:18085/*", "http://airflow.lakehouse.local:18085/*"],
+      "webOrigins": ["*"]
+    },
+    {
+      "clientId": "nifi",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "redirectUris": ["https://localhost:18443/nifi/*", "http://localhost:18443/*"],
+      "webOrigins": ["*"]
+    },
+    {
+      "clientId": "jupyterhub",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "redirectUris": ["http://localhost:18500/hub/oauth_callback", "http://jupyter.lakehouse.local:18500/hub/oauth_callback"],
+      "webOrigins": ["*"]
+    },
+    {
+      "clientId": "grafana",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "redirectUris": ["http://localhost:13000/login/generic_oauth", "http://grafana.lakehouse.local:13000/login/generic_oauth"],
+      "webOrigins": ["*"]
+    },
+    {
+      "clientId": "openmetadata",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "redirectUris": ["http://localhost:18558/callback", "http://localhost:18558/singin"],
+      "webOrigins": ["*"]
+    },
+    {
+      "clientId": "lakehouse-cli",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "directAccessGrantsEnabled": true,
+      "redirectUris": ["http://localhost/*"],
+      "webOrigins": ["*"]
+    }
+  ]
+}

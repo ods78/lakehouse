@@ -1,0 +1,111 @@
+# =============================================================================
+# LakeHouse — Phase 7: CONSUMERS
+# Apache Superset (BI over Trino/StarRocks), JupyterHub + MLflow (notebooks,
+# ML registry with artifacts on Ceph S3).
+# =============================================================================
+volumes:
+  jupyterhub-data:
+  jupyter-shared:
+
+services:
+  superset:
+    build:
+      context: ./consumers/superset
+      args:
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+    image: lakehouse/superset:${SUPERSET_VERSION}
+    container_name: lakehouse-superset
+    restart: unless-stopped
+    environment:
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY}
+      SUPERSET_CONFIG_PATH: /app/superset_config.py
+      SUPERSET_ADMIN_USER: ${SUPERSET_ADMIN_USER}
+      SUPERSET_ADMIN_PASSWORD: ${SUPERSET_ADMIN_PASSWORD}
+      SUPERSET_ADMIN_EMAIL: ${SUPERSET_ADMIN_EMAIL}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: ${TZ}
+    command: >
+      sh -c "superset db upgrade &&
+             (superset fab list-users 2>/dev/null | grep -q $$SUPERSET_ADMIN_USER ||
+              superset fab create-admin --username $$SUPERSET_ADMIN_USER --firstname Admin --lastname User --email $$SUPERSET_ADMIN_EMAIL --password $$SUPERSET_ADMIN_PASSWORD) &&
+             superset init &&
+             superset run -h 0.0.0.0 -p 8088 --with-threads"
+    ports:
+      - "${SUPERSET_HOST_PORT}:8088"
+    volumes:
+      - ./consumers/superset/superset_config.py:/app/superset_config.py:ro
+    depends_on:
+      lakehouse-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8088/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 180s
+    networks:
+      - lakehouse
+
+  jupyterhub:
+    build:
+      context: ./consumers/jupyterhub
+      args:
+        JUPYTERHUB_VERSION: ${JUPYTERHUB_VERSION}
+        HTTP_PROXY: ${HTTP_PROXY:-}
+        HTTPS_PROXY: ${HTTPS_PROXY:-}
+        NO_PROXY: ${NO_PROXY:-localhost,127.0.0.1}
+    image: lakehouse/jupyterhub:${JUPYTERHUB_VERSION}
+    container_name: lakehouse-jupyterhub
+    restart: unless-stopped
+    command: jupyterhub -f /srv/jupyterhub/jupyterhub_config.py
+    ports:
+      - "${JUPYTERHUB_HOST_PORT}:8000"
+    volumes:
+      - ./consumers/jupyterhub/jupyterhub_config.py:/srv/jupyterhub/jupyterhub_config.py:ro
+      - jupyterhub-data:/srv/jupyterhub
+      - jupyter-shared:/srv/jupyter-shared
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      JUPYTER_SINGLEUSER_IMAGE: ${JUPYTER_SINGLEUSER_IMAGE}
+      JUPYTERHUB_ALLOWED_USERS: ${JUPYTERHUB_ALLOWED_USERS}
+      TZ: ${TZ}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000/hub/api/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 90s
+    networks:
+      - lakehouse
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:${MLFLOW_VERSION}
+    container_name: lakehouse-mlflow
+    restart: unless-stopped
+    command: >
+      sh -c "pip install --quiet psycopg2-binary boto3 &&
+             mlflow server --host 0.0.0.0 --port 5000
+             --backend-store-uri postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@lakehouse-postgres:5432/mlflow
+             --artifacts-destination s3://lake-mlflow
+             --serve-artifacts"
+    environment:
+      MLFLOW_S3_ENDPOINT_URL: http://ceph-rgw:8080
+      AWS_ACCESS_KEY_ID: ${CEPH_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${CEPH_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ${S3_REGION}
+      TZ: ${TZ}
+    ports:
+      - "${MLFLOW_HOST_PORT}:5000"
+    depends_on:
+      lakehouse-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5000/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 90s
+    networks:
+      - lakehouse

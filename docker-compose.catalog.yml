@@ -1,0 +1,42 @@
+# =============================================================================
+# LakeHouse — Phase 5: TABLE FORMAT & CATALOG
+# Iceberg REST Catalog (JDBC/Postgres backend, S3FileIO against Ceph RGW).
+# NOTE: deployed early in practice — Spark/Trino/StarRocks write/read through it.
+# =============================================================================
+services:
+  iceberg-rest:
+    image: tabulario/iceberg-rest:${ICEBERG_REST_VERSION}
+    container_name: lakehouse-iceberg-rest
+    restart: unless-stopped
+    environment:
+      CATALOG_CATALOG__IMPL: org.apache.iceberg.jdbc.JdbcCatalog
+      # Server-side FileIO must be S3FileIO — the default HadoopFileIO can't
+      # resolve the s3:// warehouse scheme (image has no s3a jars)
+      CATALOG_IO__IMPL: org.apache.iceberg.aws.s3.S3FileIO
+      CATALOG_JDBC__URL: jdbc:postgresql://lakehouse-postgres:5432/iceberg_catalog
+      CATALOG_JDBC__USER: ${POSTGRES_USER}
+      CATALOG_JDBC__PASSWORD: ${POSTGRES_PASSWORD}
+      CATALOG_JDBC__INIT: "true"
+      CATALOG_WAREHOUSE: s3://lake-iceberg/warehouse
+      # S3FileIO properties use DOTS (s3.endpoint, client.region) — a single
+      # underscore in the env becomes a dot, double underscore becomes a dash
+      CATALOG_S3_ENDPOINT: http://ceph-rgw:8080
+      CATALOG_S3_PATH__STYLE__ACCESS: "true"
+      CATALOG_S3_ACCESS__KEY__ID: ${CEPH_ACCESS_KEY_ID}
+      CATALOG_S3_SECRET__ACCESS__KEY: ${CEPH_SECRET_ACCESS_KEY}
+      CATALOG_S3_REGION: us-east-1
+      CATALOG_CLIENT_REGION: us-east-1
+    ports:
+      - "${ICEBERG_REST_HOST_PORT}:8181"
+    depends_on:
+      lakehouse-postgres:
+        condition: service_healthy
+    healthcheck:
+      # Image has no curl/wget — probe the TCP port via bash /dev/tcp
+      test: ["CMD", "/bin/bash", "-c", "exec 3<>/dev/tcp/localhost/8181 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    networks:
+      - lakehouse

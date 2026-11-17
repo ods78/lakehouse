@@ -1,0 +1,23 @@
+{
+  "name": "mssql-cdc-customers",
+  "config": {
+    "connector.class": "io.debezium.connector.sqlserver.SqlServerConnector",
+    "tasks.max": "1",
+    "database.hostname": "mssql",
+    "database.port": "1433",
+    "database.user": "debezium",
+    "database.password": "__MSSQL_DEBEZIUM_PASSWORD__",
+    "database.names": "lakehouse_src",
+    "database.encrypt": "false",
+    "topic.prefix": "lakehouse",
+    "table.include.list": "dbo.customers",
+    "snapshot.mode": "initial",
+    "schema.history.internal.kafka.bootstrap.servers": "kafka:9092",
+    "schema.history.internal.kafka.topic": "schemahistory.lakehouse.customers",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "true",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "true",
+    "tombstones.on.delete": "false"
+  }
+}

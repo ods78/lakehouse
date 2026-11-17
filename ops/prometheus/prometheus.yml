@@ -1,0 +1,36 @@
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: grafana
+    static_configs:
+      - targets: ["grafana:3000"]
+
+  - job_name: loki
+    static_configs:
+      - targets: ["loki:3100"]
+
+  - job_name: trino
+    static_configs:
+      - targets: ["trino:8080"]
+
+  - job_name: starrocks-fe
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["starrocks-fe:8030"]
+
+  - job_name: openmetadata
+    metrics_path: /metrics
+    static_configs:
+      - targets: ["openmetadata-server:8586"]
+
+  - job_name: ceph-rgw
+    metrics_path: /metrics
+    scheme: http
+    static_configs:
+      - targets: ["ceph-rgw:8080"]

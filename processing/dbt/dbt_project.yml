@@ -1,0 +1,16 @@
+name: lakehouse
+version: 1.0.0
+config-version: 2
+
+profile: lakehouse
+
+model-paths: ["models"]
+
+models:
+  lakehouse:
+    staging:
+      +materialized: view
+      +schema: analytics_staging
+    marts:
+      +materialized: table
+      +schema: analytics_marts

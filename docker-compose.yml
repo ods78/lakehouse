@@ -1,0 +1,53 @@
+# =============================================================================
+# LakeHouse — BASE layer (Phase 0): network + shared PostgreSQL
+# Used together with per-phase overlays:
+#   docker compose -f docker-compose.yml -f docker-compose.<phase>.yml ...
+# Controlled by ./lakehouse.sh — see docs/runbook.md
+# =============================================================================
+name: lakehouse
+
+networks:
+  lakehouse:
+    name: lakehouse
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: ${LAKEHOUSE_SUBNET}
+
+volumes:
+  postgres-data:
+
+services:
+  # Shared metadata PostgreSQL: iceberg_catalog, airflow, keycloak, superset,
+  # nifi, mlflow, openmetadata_db  (see postgres/init/01-create-dbs.sql)
+  lakehouse-postgres:
+    image: postgres:${POSTGRES_VERSION}
+    container_name: lakehouse-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      TZ: ${TZ}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    command:
+      - postgres
+      - -c
+      - max_connections=500
+      - -c
+      - shared_buffers=1GB
+      - -c
+      - work_mem=64MB
+    ports:
+      - "${POSTGRES_HOST_PORT}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    networks:
+      - lakehouse

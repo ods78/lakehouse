@@ -1,0 +1,379 @@
+{
+  "phase1_query_latency": {
+    "phase": 1,
+    "generated_at": "2026-11-16T05:17:07.732119+00:00",
+    "dataset": {
+      "lineorder_rows": 2000000,
+      "customer_rows": 100000,
+      "product_rows": 50000
+    },
+    "method": "1 warmup + 5 measured iterations per engine per query",
+    "engines": {
+      "trino": {
+        "Q1_revenue_by_region_join_customer": {
+          "warmup_s": 0.6852,
+          "runs_s": [
+            0.6349,
+            0.6596,
+            0.6295,
+            0.6512,
+            0.6544
+          ],
+          "median_s": 0.6512,
+          "mean_s": 0.6459,
+          "stdev_s": 0.013,
+          "rows_returned": 5
+        },
+        "Q2_category_revenue_join_product": {
+          "warmup_s": 0.9908,
+          "runs_s": [
+            0.5469,
+            0.4955,
+            0.427,
+            0.4227,
+            0.4506
+          ],
+          "median_s": 0.4506,
+          "mean_s": 0.4685,
+          "stdev_s": 0.0525,
+          "rows_returned": 5
+        },
+        "Q3_three_table_join_having": {
+          "warmup_s": 1.6833,
+          "runs_s": [
+            0.8754,
+            0.8674,
+            0.8674,
+            0.7802,
+            0.8225
+          ],
+          "median_s": 0.8674,
+          "mean_s": 0.8426,
+          "stdev_s": 0.0406,
+          "rows_returned": 25
+        },
+        "Q4_top3_nations_per_region_window": {
+          "warmup_s": 0.8974,
+          "runs_s": [
+            0.6415,
+            0.6743,
+            0.6307,
+            0.6278,
+            0.6557
+          ],
+          "median_s": 0.6415,
+          "mean_s": 0.646,
+          "stdev_s": 0.0192,
+          "rows_returned": 15
+        },
+        "Q5_segment_distinct_customers": {
+          "warmup_s": 2.0938,
+          "runs_s": [
+            0.8522,
+            0.7395,
+            0.6624,
+            0.6693,
+            0.6539
+          ],
+          "median_s": 0.6693,
+          "mean_s": 0.7155,
+          "stdev_s": 0.0837,
+          "rows_returned": 5
+        }
+      },
+      "clickhouse": {
+        "Q1_revenue_by_region_join_customer": {
+          "warmup_s": 0.0501,
+          "runs_s": [
+            0.0427,
+            0.0441,
+            0.0822,
+            0.041,
+            0.0391
+          ],
+          "median_s": 0.0427,
+          "mean_s": 0.0498,
+          "stdev_s": 0.0182,
+          "rows_returned": 5
+        },
+        "Q2_category_revenue_join_product": {
+          "warmup_s": 0.0399,
+          "runs_s": [
+            0.039,
+            0.0456,
+            0.0748,
+            0.0409,
+            0.0422
+          ],
+          "median_s": 0.0422,
+          "mean_s": 0.0485,
+          "stdev_s": 0.0149,
+          "rows_returned": 5
+        },
+        "Q3_three_table_join_having": {
+          "warmup_s": 0.0701,
+          "runs_s": [
+            0.057,
+            0.058,
+            0.1016,
+            0.0625,
+            0.0613
+          ],
+          "median_s": 0.0613,
+          "mean_s": 0.0681,
+          "stdev_s": 0.0189,
+          "rows_returned": 25
+        },
+        "Q4_top3_nations_per_region_window": {
+          "warmup_s": 0.1021,
+          "runs_s": [
+            0.082,
+            0.0693,
+            0.0624,
+            0.0706,
+            0.0699
+          ],
+          "median_s": 0.0699,
+          "mean_s": 0.0708,
+          "stdev_s": 0.0071,
+          "rows_returned": 15
+        },
+        "Q5_segment_distinct_customers": {
+          "warmup_s": 0.0489,
+          "runs_s": [
+            0.0488,
+            0.053,
+            0.0814,
+            0.0458,
+            0.0454
+          ],
+          "median_s": 0.0488,
+          "mean_s": 0.0549,
+          "stdev_s": 0.0151,
+          "rows_returned": 5
+        }
+      }
+    }
+  },
+  "phase1_load_test": {
+    "tool": "k6 v0.57.0",
+    "target": "ClickHouse HTTP (localhost:18123), 2M-row bench.lineorder aggregation",
+    "profile": {
+      "ramp_to_50_vus": "30s",
+      "hold_50_vus": "120s",
+      "ramp_down": "15s"
+    },
+    "iterations_total": 23398,
+    "throughput_req_per_s": 141.81,
+    "latency_ms": {
+      "avg": 304.3,
+      "median": 240.8,
+      "p90": 617.3,
+      "p95": 692.4,
+      "max": 1310.7
+    },
+    "error_rate": 0,
+    "checks_pass_rate": 1
+  },
+  "phase2_cdc_ingestion": {
+    "phase": 2,
+    "generated_at": "2026-11-16T05:42:42.843597+00:00",
+    "pipeline": "SQL Server (dbo.bench_cdc_orders) -> Debezium 2.7.3 (mssql-cdc-bench, JSON) -> Kafka (benchcdc.lakehouse_src.dbo.bench_cdc_orders, 1 partition) -> ClickHouse Kafka-engine + materialized view -> bench.cdc_orders (MergeTree)",
+    "rows_inserted": 1000000,
+    "mssql_insert_wall_s": 10.73,
+    "e2e_latency_s": 51.14,
+    "first_row_in_ch_s": 39.83,
+    "kafka_all_events_at_s": null,
+    "ch_consumer_effective_rows_per_s": 52867.0,
+    "final_kafka_end_offset": 1000006,
+    "final_ch_count": 1000000,
+    "kafka_timeline": [
+      [
+        10.73,
+        6
+      ],
+      [
+        21.21,
+        6
+      ],
+      [
+        31.61,
+        195555
+      ],
+      [
+        41.85,
+        751880
+      ]
+    ],
+    "ch_timeline": [
+      [
+        10.73,
+        0
+      ],
+      [
+        14.12,
+        0
+      ],
+      [
+        15.14,
+        0
+      ],
+      [
+        16.15,
+        0
+      ],
+      [
+        17.16,
+        0
+      ],
+      [
+        18.18,
+        0
+      ],
+      [
+        19.19,
+        0
+      ],
+      [
+        20.2,
+        0
+      ],
+      [
+        21.21,
+        0
+      ],
+      [
+        24.52,
+        0
+      ],
+      [
+        25.53,
+        0
+      ],
+      [
+        26.55,
+        0
+      ],
+      [
+        27.56,
+        0
+      ],
+      [
+        28.58,
+        0
+      ],
+      [
+        29.59,
+        0
+      ],
+      [
+        30.6,
+        0
+      ],
+      [
+        31.61,
+        0
+      ],
+      [
+        34.77,
+        0
+      ],
+      [
+        35.78,
+        0
+      ],
+      [
+        36.8,
+        0
+      ],
+      [
+        37.81,
+        0
+      ],
+      [
+        38.82,
+        0
+      ],
+      [
+        39.83,
+        402074
+      ],
+      [
+        40.84,
+        402074
+      ],
+      [
+        41.85,
+        402074
+      ],
+      [
+        45.07,
+        402074
+      ],
+      [
+        46.08,
+        402074
+      ],
+      [
+        47.09,
+        402074
+      ],
+      [
+        48.1,
+        402074
+      ],
+      [
+        49.12,
+        402074
+      ],
+      [
+        50.13,
+        926349
+      ],
+      [
+        51.14,
+        1000000
+      ]
+    ],
+    "clickhouse_size": {
+      "rows": 1000000,
+      "bytes_on_disk": 27002569,
+      "on_disk_mb": 27.0,
+      "compressed_bytes": 26996857,
+      "uncompressed_bytes": 73977792,
+      "uncompressed_mb": 73.98,
+      "compression_ratio": 2.74,
+      "parts": 3
+    },
+    "mssql_size_mb_reserved": 113.5,
+    "settings_note": "Debezium defaults (max.batch.size=2000, poll 500ms); MSSQL CDC capture job default 5s polling; ClickHouse Kafka engine 1 consumer, stream_flush_interval_ms=1000",
+    "mssql_size_note": "approximate source-side size for 1M rows (119 MB measured at 1,048,576 rows in the first pass, linearly scaled)"
+  },
+  "phase3_failover": {
+    "phase": 3,
+    "generated_at": "2026-11-16T07:41:51.295784+00:00",
+    "test": "single-node serving-tier failure (docker restart lakehouse-clickhouse) under continuous load through HAProxy edge",
+    "client_path": "python http client -> HAProxy :10080 (Host: clickhouse.lakehouse.local) -> backend be_clickhouse -> clickhouse:8123",
+    "concurrency": 6,
+    "query": "SELECT lo_year, count() FROM bench.lineorder (2M rows) GROUP BY lo_year",
+    "baseline_s": 15,
+    "failure_injected_at": "2026-11-16T07:41:16.510744+00:00",
+    "unavailability_window_s": 12.29,
+    "recovery_time_s_from_restart": 12.29,
+    "first_failure_at_s": 15.36,
+    "first_success_after_failure_s": 27.65,
+    "sustained_recovery_at_s": 27.65,
+    "failed_requests": 8103,
+    "successful_requests": 8688,
+    "total_requests": 16791,
+    "failure_breakdown": {
+      "http_503": 8091,
+      "TimeoutError: timed out": 12
+    },
+    "availability_pct_during_test": 51.742,
+    "healthy_latency_ms": {
+      "median": 21.8,
+      "p95": 32.8
+    }
+  }
+}

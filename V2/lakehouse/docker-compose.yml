@@ -1,0 +1,38 @@
+# Base: networks, volumes, shared PostgreSQL. Overlays in compose/ are merged via COMPOSE_FILE (.env)
+# and selected with profiles:  docker compose --profile ingestion up -d
+name: lakehouse
+
+networks:
+  lh_sources:    {external: true}
+  lh_ingestion:  {external: true}
+  lh_storage:    {external: true}
+  lh_processing: {external: true}
+  lh_serving:    {external: true}
+  lh_consumers:  {external: true}
+  lh_ops:        {external: true}
+
+volumes:
+  pg-data:
+  mssql-data:
+  kafka-data:
+  nifi-state:
+  s3-data:
+  clickhouse-data:
+
+services:
+  postgres:   # always on (no profile): Iceberg catalog, Airflow, Keycloak, Superset, NiFi, OpenMetadata DBs
+    image: postgres:${POSTGRES_VERSION}
+    container_name: lh-postgres
+    env_file: .env
+    environment:
+      POSTGRES_USER: postgres
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./init/postgres:/docker-entrypoint-initdb.d:ro
+    ports: ["127.0.0.1:5432:5432"]
+    networks: [lh_ops, lh_storage, lh_processing, lh_consumers]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 20
+    restart: unless-stopped

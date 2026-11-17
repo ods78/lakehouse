@@ -1,0 +1,13 @@
+# Secrets and credentials
+.env
+ops/vault/keys/
+backups/
+
+# Runtime
+__pycache__/
+*.pyc
+dbt/target/
+dbt/logs/
+
+# Large artifacts (reproducible: benchmarks/gen_dataset.py + jar downloads)
+*.log

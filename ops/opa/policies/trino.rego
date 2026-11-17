@@ -1,0 +1,28 @@
+# OPA 1.x (Rego v1) policy for the Trino access-control plugin.
+# Decision endpoint: POST /v1/data/trino/allow  ->  {"allow": <bool>}
+# Rendered from trino.rego.tmpl by scripts/render-configs.sh (admin list from .env)
+package trino
+
+default allow := false
+
+# Admins from .env OPA_ADMIN_USERS (includes lakehouse-dbt for dbt writes,
+# lakehouse-dq for Great Expectations reads)
+admins := {"admin","lakehouse-dbt","lakehouse-dq"}
+
+allow if {
+	some admin in admins
+	trimmed := trim_space(admin)
+	trimmed != ""
+	lower(input.context.identity.user) == lower(trimmed)
+}
+
+# Analysts get read access (SELECT-like operations) everywhere.
+allow if {
+	lower(input.context.identity.user) == "analyst"
+	read_only
+}
+
+read_only if {
+	some op in {"SELECT", "SHOW", "DESCRIBE", "EXPLAIN"}
+	op == input.action.operation
+}

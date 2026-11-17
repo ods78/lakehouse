@@ -1,0 +1,11 @@
+lakehouse:
+  target: dev
+  outputs:
+    dev:
+      type: trino
+      host: trino
+      port: 8080
+      user: lakehouse-dbt
+      catalog: lakehouse
+      schema: analytics
+      threads: 4

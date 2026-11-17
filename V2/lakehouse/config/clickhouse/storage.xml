@@ -1,0 +1,24 @@
+<clickhouse>
+  <storage_configuration>
+    <disks>
+      <s3_cold>
+        <type>s3</type>
+        <!-- bucket "lake", prefix clickhouse-cold/ (path-style) -->
+        <endpoint>http://s3:8333/lake/clickhouse-cold/</endpoint>
+        <access_key_id from_env="S3_ACCESS_KEY"/>
+        <secret_access_key from_env="S3_SECRET_KEY"/>
+        <region>us-east-1</region>
+        <metadata_path>/var/lib/clickhouse/disks/s3_cold/</metadata_path>
+      </s3_cold>
+    </disks>
+    <policies>
+      <hot_cold>
+        <volumes>
+          <hot><disk>default</disk></hot>
+          <cold><disk>s3_cold</disk></cold>
+        </volumes>
+        <move_factor>0.1</move_factor>
+      </hot_cold>
+    </policies>
+  </storage_configuration>
+</clickhouse>
